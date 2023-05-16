@@ -14,8 +14,21 @@ setwd("C:/Users/Mende012/Documents/Bioinformatics/Cell_death/Analysis_disease_sy
 # load file
 df <- read_xlsx("MM20230516_summary_visual_score_cell_death.xlsx")
 
+# rename columns and select only relevant columns
+df <- data.frame("date_infiltration" = df$`Date infiltartion`,
+                 "Effector_line" = df$`Effector line`, 
+                 "disease_score_0" = df$disease_score_0,
+                 "disease_score_1" = df$disease_score_1,
+                 "disease_score_2" = df$disease_score_2,
+                 "disease_score_3" = df$disease_score_3,
+                 "disease_score_4" = df$disease_score_4,
+                 "nr_infiltration_spots" = df$`n (infiltration spots)`)
 
-### calculate the proportions in % of cell-death positive/negative infiltration spots
+
+# calculate average disease score 
+
+### calculate the proportions (%) of each disease-score 
+
 
 # pool control samples that are present in every experiment
 
