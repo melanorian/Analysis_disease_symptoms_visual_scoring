@@ -93,8 +93,21 @@ ggplot(df_sorted, aes(x = Effector_line, y = res_perc, fill = disease_score)) +
 
 # E) Plot simple, stagged bar graph for all effector lines
 simple_df <- data.frame(df_sorted$Effector_line, df_sorted$disease_score, df_sorted$count)
-n_samples <- ###!!!
 
+# get a list of all the unique effector lines
+e_lines <- unique(df$Effector_line)
+
+# write function to sum up all the +/- infiltration spots (to account for repeating control samples)
+sum_d <-  lapply(e_lines, function(x){ # sum up of cell-death POSITIVE
+  a <- df[(df$Effector_line == x),] # subset datset by effector line
+  b <- sum(a$nr_infiltration_spots) # sum infiltration spots WITH cell death
+  return(b)
+}) %>% unlist()
+
+simple_df_d <- as.data.frame(cbind(unlist(e_lines), as.numeric(sum_d))) # df cell death'
+labels <- simple_df_d$V2
+
+# draw stagged bar graph
 ggp <- ggplot(simple_df, aes(x = df_sorted.Effector_line, y = df_sorted.count,
                             fill = df_sorted.disease_score)) +
        geom_bar(position = "fill", stat = "identity") +
@@ -110,9 +123,10 @@ ggp <- ggplot(simple_df, aes(x = df_sorted.Effector_line, y = df_sorted.count,
        # label the axises 
        xlab("Effector") +                
        ylab("% disease score") +
-       theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
-       # label individual bars
-       geom_text(aes(label = n_samples), vjust = -0.5)
+       theme(axis.text.x = element_text(angle = 90, hjust = 1)) 
+    #!!!   # label individual bars
+       #geom_text(size = 3, position = position_stack(vjust = 0.5))
+
 
 
 
