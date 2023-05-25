@@ -1,34 +1,84 @@
-# clean environment 
+# A) General basics ----
+# 1. clean environment 
 rm(list=ls())
 
-# open libraries
+# 2. open libraries
 library(ggplot2)
 library(dplyr)
 library(tidyverse)
 library(readxl)
 library(plotly)
 
-# set working directory
+# 3. set working directory
 setwd("C:/Users/Mende012/Documents/Bioinformatics/Cell_death/Analysis_disease_symptoms_visual_scoring")
 
-# load file
+# 4. load file
 df <- read_xlsx("MM20230516_summary_visual_score_cell_death.xlsx")
 
-# rename columns and select only relevant columns
+# B) get data(frame) into desired shape ----
+# 5. rename columns and select only relevant columns
 df <- data.frame("date_infiltration" = df$`Date infiltartion`,
                  "Effector_line" = df$`Effector line`, 
-                 "disease_score_0" = df$disease_score_0,
-                 "disease_score_1" = df$disease_score_1,
-                 "disease_score_2" = df$disease_score_2,
-                 "disease_score_3" = df$disease_score_3,
-                 "disease_score_4" = df$disease_score_4,
-                 "nr_infiltration_spots" = df$`n (infiltration spots)`)
+                 "nr_score_0" = df$disease_score_0,
+                 "nr_score_1" = df$disease_score_1,
+                 "nr_score_2" = df$disease_score_2,
+                 "nr_score_3" = df$disease_score_3,
+                 "nr_score_4" = df$disease_score_4,
+                 "nr_infiltration_spots" = df$`n (infiltration spots)`,
+                 "avg_score" = df$`average disease score`)
 
 
-# calculate average disease score 
+# drop first row that only contains numbers of disease scores
+df <- df[!(rownames(df) == '1'),]
 
-### calculate the proportions (%) of each disease-score 
+# C) calculate the percentages of disease score incidences ----
+# 6. create input vectors
 
+# vector of row numbers  
+rows <- as.vector(1:length(df$Effector_line)) 
+
+# Vector of colnames containing scores
+n_scores <- grep("nr_score_", colnames(df), value = TRUE) 
+
+
+# 7. Apply the p_calc function to each row for each nr_score
+percentages <- lapply(n_scores, function(score) {
+  lapply(rows, function(row_nr) {
+    nr_sum <- df$nr_infiltration_spots[row_nr]
+    nr_score <- df[[score]][row_nr]
+    perc <- (nr_score / nr_sum) * 100
+    return(perc)
+  })
+})
+
+# transform that into a usable df
+
+#----------------------------------------
+# reshape df
+# https://r-charts.com/part-whole/stacked-bar-chart-ggplot2/
+# x axis - effector line
+# fill - group (disease intensity 0-4 %)
+# 
+#-------------------------
+
+# Basic stagged plot
+library(ggplot2)
+
+ggplot(df, aes(x = x, y = y, fill = group)) + 
+  geom_bar(stat = "identity") +
+  scale_fill_manual(values = c("#DADAEB", "#9E9AC8", "#6A51A3")) 
+#---------------
+
+# Change from wide to long format
+reshape(df, direction = "long". varyin  )
+
+
+
+
+perc <- lapply(unique(df$assay_id), function(x) as.data.frame(DunnettTest(area_under_curve ~ treatment_id, 
+                                                                                data = df[df$assay_id==x,], 
+                                                                                control = "D36E_Bacterial PAMPs", 
+                                                                                conf.level = 0.95)$`D36E_Bacterial PAMPs`)) %>% bind_rows()  
 
 # pool control samples that are present in every experiment
 
