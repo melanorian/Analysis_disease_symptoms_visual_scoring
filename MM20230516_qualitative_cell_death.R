@@ -2,18 +2,26 @@
 # 1. clean environment 
 rm(list=ls())
 
+# generate prefix string
+current_date <- Sys.Date() # Get the current date
+print(MM, current_date)
+
+
 # 2. open libraries
 library(ggplot2)
 library(dplyr)
 library(tidyverse)
 library(readxl)
 library(plotly)
+library(tidyr)
 
 # 3. set working directory
 setwd("C:/Users/Mende012/Documents/Bioinformatics/Cell_death/Analysis_disease_symptoms_visual_scoring")
 
 # 4. load file
 df <- read_xlsx("MM20230516_summary_visual_score_cell_death.xlsx")
+
+
 
 # B) get data(frame) into desired shape ----
 # 5. rename columns and select only relevant columns
@@ -31,7 +39,7 @@ df <- data.frame("date_infiltration" = df$`Date infiltartion`,
 # drop first row that only contains numbers of disease scores
 df <- df[!(rownames(df) == '1'),]
 
-# C) calculate the percentages of disease score incidences ----
+# C) calculate the percentages of disease score incidences and store in df ----
 # 6. create input vectors
 
 # vector of row numbers  
@@ -40,20 +48,37 @@ rows <- as.vector(1:length(df$Effector_line))
 # Vector of colnames containing scores
 n_scores <- grep("nr_score_", colnames(df), value = TRUE) 
 
+## 7. Design a function that can calculate the percentage of infiltration spots
+# that was scored with a specific disease severity. Run the function to obtain a 
+# list of values. 
 
-# 7. Apply the p_calc function to each row for each nr_score
-percentages <- lapply(n_scores, function(score) {
-  lapply(rows, function(row_nr) {
+result_perc <- do.call(cbind, lapply(n_scores, function(score) {
+  t(sapply(rows, function(row_nr) {
     nr_sum <- df$nr_infiltration_spots[row_nr]
     nr_score <- df[[score]][row_nr]
     perc <- (nr_score / nr_sum) * 100
     return(perc)
-  })
-})
+  }))
+})) %>% t()
 
-# transform that into a usable df
+# 8. Convert the original df to a long format so that the % results can be added
+# 8.1 Convert the dataframe from wide to long format
+df_long <- tidyr::pivot_longer(df, 
+                               cols = starts_with("nr_score_"), 
+                               names_to = "disease_score", 
+                               values_to = "count")
 
-#----------------------------------------
+
+# Sort the dataframe by first "disease_score", "disease_score", "Effector_line" columns in ascending order
+df_sorted <- arrange(df_long, disease_score, v, Effector_line)
+
+# 8.2 add the % (output of 7.) to the df_sorted, make EXTRA sure they are in the 
+#     correct order
+df_sorted$res_perc <- result_perc
+
+
+# D) create a stagged bar graph from the df_sorted ----
+
 # reshape df
 # https://r-charts.com/part-whole/stacked-bar-chart-ggplot2/
 # x axis - effector line
@@ -61,106 +86,38 @@ percentages <- lapply(n_scores, function(score) {
 # 
 #-------------------------
 
-# Basic stagged plot
-library(ggplot2)
+ggplot(df_sorted, aes(x = Effector_line, y = res_perc, fill = disease_score)) + 
+  geom_bar(stat = "identity")
 
-ggplot(df, aes(x = x, y = y, fill = group)) + 
-  geom_bar(stat = "identity") +
-  scale_fill_manual(values = c("#DADAEB", "#9E9AC8", "#6A51A3")) 
-#---------------
+# --> output super odd, did something go wrong before?
 
-# Change from wide to long format
-reshape(df, direction = "long". varyin  )
+# E) Plot simple, stagged bar graph for all effector lines
+simple_df <- data.frame(df_sorted$Effector_line, df_sorted$disease_score, df_sorted$count)
+n_samples <- ###!!!
 
-
-
-
-perc <- lapply(unique(df$assay_id), function(x) as.data.frame(DunnettTest(area_under_curve ~ treatment_id, 
-                                                                                data = df[df$assay_id==x,], 
-                                                                                control = "D36E_Bacterial PAMPs", 
-                                                                                conf.level = 0.95)$`D36E_Bacterial PAMPs`)) %>% bind_rows()  
-
-# pool control samples that are present in every experiment
-
-# get a list of all the unique effector lines
-e_lines <- unique(df$`Effector line`)
-
-# write function to sum up all the +/- infiltration spots (to account for repeating control samples)
-
-sum_d <-  lapply(e_lines, function(x){ # sum up of cell-death POSITIVE
-          a <- df[(df$`Effector line` == x),] # subset datset by effector line
-          b <- sum(a$`Positive = visual signs of cell death`) # sum infiltration spots WITH cell death
-          return(b)
-}) %>% unlist()
-
-sum_n <- lapply(e_lines, function(x){ # sum up of cell-death NEGATIVE
-  a <- df[(df$`Effector line` == x),] # subset datset by effector line
-  b <- sum(a$`Negative = no visual signs of cell death`) # sum infiltration spots NO cell death
-  return(b)
-}) %>% unlist()
-
-
-# store in new dataframe
-simple_df_d <- as.data.frame(cbind(unlist(e_lines), as.numeric(sum_d))) # df cell death
-simple_df_n <- as.data.frame(cbind(unlist(e_lines), as.numeric(sum_n))) # df no cell death
-
-
-# rename columns of simple_df in a sensible way
-colnames(simple_df_d)[c(1, 2)] = c("Effector", "count_death")
-colnames(simple_df_n)[c(1, 2)] = c("Effector", "count_death")
-
-# add column with "condition" which states cell death positive or negative 
-# this is necessary to get data into the right shape for plotting
-simple_df_d["condition"] <- as.vector(rep("death", times = length(e_lines)))
-simple_df_n["condition"] <- as.vector(rep("no death", times = length(e_lines)))
-
-# join the data frame for plotting
-simple_df <- full_join(simple_df_d, simple_df_n)
-
-
-##################
-#################
-################# probably add statistics here???? https://statsandr.com/blog/fisher-s-exact-test-in-r-independence-test-for-a-small-sample/
-
-# function to sum up 
-nr_spots <- lapply(e_lines, function(x){
-  line <- simple_df[simple_df$Effector == x,]
-  s <- sum(as.numeric(line$count_death))
-  return(s)
-}) 
-
-# add nr all infiltration spots to df
-simple_df["nr_spots"] <- unlist(nr_spots) 
-
-# calculate percentag
-percentage <- (as.numeric(simple_df$count_death)/as.numeric(simple_df$nr_spots))*100
-simple_df["Percentage"] <- percentage
-
-#simple_df <- simple_df[!(simple_df$condition== "no death"),]
-
-#############################
-
-# draw percent stacked barchart (https://r-graph-gallery.com/48-grouped-barplot-with-ggplot2.html)
-  
-g1 <- ggplot(simple_df, aes(fill = condition, x = Effector, y = Percentage)) +
-         geom_col(position = position_fill(reverse = TRUE)) +
-        scale_fill_manual(values = c("#E69F00", "#faebcc")) +
-  
-  # define axis limits if needed
-  coord_cartesian(ylim = c(0.1, 1))  +
-
-        # define the theme of the boxplot
-  theme_bw() +  # make the bg white
-  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), 
+ggp <- ggplot(simple_df, aes(x = df_sorted.Effector_line, y = df_sorted.count,
+                            fill = df_sorted.disease_score)) +
+       geom_bar(position = "fill", stat = "identity") +
+       # asign colours
+       scale_fill_manual(values = c("#fffbf1", "#ffeabc", "#ffbe2d", "#E69F00", "#D55E00")) +
+       # define axis limits if needed
+       coord_cartesian(ylim = c(0.1, 1))  +
+       # define the theme of the boxplot
+       theme_bw() +  # make the bg white
+        theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), 
         panel.border = element_blank(), # remove background, frame
-        axis.line = element_line(colour = "black")) +
+        axis.line = element_line(colour = "black"))+
+       # label the axises 
+       xlab("Effector") +                
+       ylab("% disease score") +
+       theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+       # label individual bars
+       geom_text(aes(label = n_samples), vjust = -0.5)
 
-        # label the axises 
-  xlab("Effector") +                
-  ylab("% cell death positive infiltration spots)") +
-  theme(axis.text.x = element_text(angle = 70, hjust = 1))
 
-g1
+
+
+ggp                                 # Draw ggplot2 plot scaled to 1.00
 
 
 ggsave("MM20230111_cell_death.svg",width = 7, height = 4)
