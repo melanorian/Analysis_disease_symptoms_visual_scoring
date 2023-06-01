@@ -12,7 +12,7 @@ library(plotly)
 setwd("C:/Users/Mende012/Documents/Bioinformatics/Cell_death/Analysis_disease_symptoms_visual_scoring")
 
 # load file
-df <- read_xlsx("MM20230516_summary_visual_score_cell_death.xlsx")
+df <- read_xlsx("MM20221125_summary_visual_score_cell_death.xlsx")
 
 
 ### calculate the proportions in % of cell-death positive/negative infiltration spots
