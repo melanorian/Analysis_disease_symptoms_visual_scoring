@@ -2,9 +2,12 @@
 # 1. clean environment 
 rm(list=ls())
 
-# generate prefix string
-current_date <- Sys.Date() # Get the current date
-print(MM, current_date)
+# Generate suffix for output names
+SUF <- "1"
+
+# generate prefix string including date/ Initials
+current_date <- gsub("-", "", as.character(Sys.Date()))# Get the current date as character
+pre <- paste("MM", current_date, sep = "")
 
 
 # 2. open libraries
@@ -19,7 +22,7 @@ library(tidyr)
 setwd("C:/Users/Mende012/Documents/Bioinformatics/Cell_death/Analysis_disease_symptoms_visual_scoring")
 
 # 4. load file
-df <- read_xlsx("MM20230516_summary_visual_score_cell_death.xlsx")
+df <- read_xlsx("MM20230601_summary_visual_score.xlsx")
 
 
 
@@ -61,7 +64,7 @@ result_perc <- do.call(cbind, lapply(n_scores, function(score) {
   }))
 })) %>% t()
 
-# 8. Convert the original df to a long format so that the % results can be added
+# 8.!! Convert the original df to a long format so that the % results can be added
 # 8.1 Convert the dataframe from wide to long format
 df_long <- tidyr::pivot_longer(df, 
                                cols = starts_with("nr_score_"), 
@@ -69,8 +72,8 @@ df_long <- tidyr::pivot_longer(df,
                                values_to = "count")
 
 
-# Sort the dataframe by first "disease_score", "disease_score", "Effector_line" columns in ascending order
-df_sorted <- arrange(df_long, disease_score, v, Effector_line)
+#!!! Sort the dataframe by first "disease_score", "disease_score", "Effector_line" columns in ascending order
+df_sorted <- arrange(df_long, disease_score, Effector_line)
 
 # 8.2 add the % (output of 7.) to the df_sorted, make EXTRA sure they are in the 
 #     correct order
@@ -86,11 +89,6 @@ df_sorted$res_perc <- result_perc
 # 
 #-------------------------
 
-ggplot(df_sorted, aes(x = Effector_line, y = res_perc, fill = disease_score)) + 
-  geom_bar(stat = "identity")
-
-# --> output super odd, did something go wrong before?
-
 # E) Plot simple, stagged bar graph for all effector lines
 simple_df <- data.frame(df_sorted$Effector_line, df_sorted$disease_score, df_sorted$count)
 
@@ -105,7 +103,12 @@ sum_d <-  lapply(e_lines, function(x){ # sum up of cell-death POSITIVE
 }) %>% unlist()
 
 simple_df_d <- as.data.frame(cbind(unlist(e_lines), as.numeric(sum_d))) # df cell death'
+simple_df_d <- arrange(simple_df_d, V1)
 labels <- simple_df_d$V2
+
+# add the labels to the simple_df
+merged_df <- merge(simple_df, simple_df_d)
+merged_df <- arrange(merged_df, merged_df$df_sorted.Effector_line)
 
 # draw stagged bar graph
 ggp <- ggplot(simple_df, aes(x = df_sorted.Effector_line, y = df_sorted.count,
@@ -114,7 +117,7 @@ ggp <- ggplot(simple_df, aes(x = df_sorted.Effector_line, y = df_sorted.count,
        # asign colours
        scale_fill_manual(values = c("#fffbf1", "#ffeabc", "#ffbe2d", "#E69F00", "#D55E00")) +
        # define axis limits if needed
-       coord_cartesian(ylim = c(0.1, 1))  +
+       coord_cartesian(ylim = c(0.05, 1.0))  +
        # define the theme of the boxplot
        theme_bw() +  # make the bg white
         theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), 
@@ -125,7 +128,7 @@ ggp <- ggplot(simple_df, aes(x = df_sorted.Effector_line, y = df_sorted.count,
        ylab("% disease score") +
        theme(axis.text.x = element_text(angle = 90, hjust = 1)) 
     #!!!   # label individual bars
-       #geom_text(size = 3, position = position_stack(vjust = 0.5))
+       #geom_text(label = labels ,size = 3, hjust = 1)
 
 
 
@@ -134,11 +137,17 @@ ggp <- ggplot(simple_df, aes(x = df_sorted.Effector_line, y = df_sorted.count,
 ggp                                 # Draw ggplot2 plot scaled to 1.00
 
 
-ggsave("MM20230111_cell_death.svg",width = 7, height = 4)
-g1
+ggsave(paste(pre, sep = "","_cell_death.svg"),width = 7, height = 4)
+ggp
 dev.off()
 
-ggplotly(g1)
+ggplotly(ggp)
+
+#############################################################################
+############################# Statistics ####################################
+#############################################################################
+
+
 
 ##############################################################################
 #########################  export for summary heat map #######################
