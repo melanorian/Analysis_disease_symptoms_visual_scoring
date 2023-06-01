@@ -22,7 +22,7 @@ library(tidyr)
 setwd("C:/Users/Mende012/Documents/Bioinformatics/Cell_death/Analysis_disease_symptoms_visual_scoring")
 
 # 4. load file
-df <- read_xlsx("MM20230601_summary_visual_score.xlsx")
+df <- read_xlsx("MM20230601_summary_visual_score_stat_2_3_4_positive.xlsx")
 
 
 
@@ -214,7 +214,6 @@ simple_df_2["Percentage"] <- percentage
 # samples (<5) in some groups --> Fisher's exact test ----
 
 # bring datafram in a shape that's suitable for Fisher's exact test 
-
 # re-name df so that info on cell-death-pos/neg can be merged based on effectors
 
 
@@ -267,11 +266,17 @@ F_test$Effectors <- row.names(F_test)
 df_stat$Effectors <- row.names(df_stat)
 
 # merge datafram
+
 m <- merge(df_stat, F_test)
 
-# safe results in a txt file
-write.table(m, file = "./MM20230125_celldeath_assay_stats.txt")
+# add column with % of disease-symptom positive infiltration spots
+perc_pos <- subset(simple_df_2, !grepl("no death", condition))
+perc_pos <- arrange(perc_pos, Effector )
 
+m$perc_pos <- perc_pos$Percentage
+
+# safe results in a txt file
+write.table(m, file = paste(pre, sep = "","_stats_cell_death_2_3_4_positive.txt"))
 
 ##############################################################################
 #########################  export for summary heat map #######################
