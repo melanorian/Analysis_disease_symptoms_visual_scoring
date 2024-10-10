@@ -20,6 +20,8 @@ pre <- paste("MM", current_date, sep = "")
 setwd("/home/melanie/D36E_assays/disease_data")
 dir_out <- "/home/melanie/D36E_assays/disease_output/"
 
+col <- c("#fffbf1", "#ffeabc", "#ffbe2d", "#E69F00", "#D55E00")
+
 # 4. load file
 df <- read_csv("MM01102024_SEMIQUANT_visual_disease_score.csv")
 
@@ -67,19 +69,17 @@ head(df_long)
 # Replace dates with dpi for easier interpretation
 df_plot <- df_long %>%
   mutate(date_scoring = recode(date_scoring, 
-                               "25/09/2024" = "O dpi", 
-                               "27/09/2024" = "2 dpi", 
-                               "1/10/2024" = "6 dpi")
+                               "25/09/2024" = "Odpi", 
+                               "27/09/2024" = "2dpi", 
+                               "1/10/2024" = "6dpi")
          )
 
 
 # 4.2 Define the function to generate and save plots for each subset
 # Function for individual plots
-f_dpi_plot <- function(df, dpi) {
+f_dpi_plot <- function(df, titles) {
 
-subset_df <- df[df$date_scoring == dpi, ]
-
-g <- ggplot(subset_df, 
+g <- ggplot(df, 
            aes(x = Effector_line, 
                y = count,
                fill = disease_score
@@ -103,7 +103,7 @@ theme(
       legend.title = element_text(size=14), 
       legend.text = element_text(size=12)
       )+
-ggtitle(paste0("timepoint: ", dpi)) +
+ggtitle(paste0("timepoint: ", titles)) +
 xlab("Effector line") +                
 ylab("% disease score") +
 theme(axis.text.x = element_text(angle = 45, hjust = 1)
@@ -113,7 +113,6 @@ return(g)
 }
 
 # Function for grid of plots 
-
 f_grid <- function(plot_list) {
 #plot_list <- strain_plots
 # Extract the legend from the first plot using cowplot::get_legend
@@ -140,19 +139,84 @@ final_plot <- plot_grid(combined_plot, legend,
 return(final_plot)
 }
 
-unique_time <- unique(df_plot$date_scoring)
+# Function to safe plots by pre/suffix as grids
+f_save_grid_prefix <- function(plot_list, prefix){
+  
+  plot_names <- names(plot_list)
+  plots_for_grid <- plot_list[str_extract(titles_dpi_OD, "^[^_]+") == prefix]
+  title <- names(plots_for_grid)
+  
+  grid <- f_grid(plots_for_grid)
+  
+  ggsave(filename = paste0(dir_out, pre, "_", prefix, "_grid", ".svg"),
+         plot = grid, 
+         width = 9, 
+         height = 4, 
+         units = "in"
+  )
+  
+}
 
-col <- c("#fffbf1", "#ffeabc", "#ffbe2d", "#E69F00", "#D55E00")
-dpi_plots <- lapply(unique_time, 
-                     f_dpi_plot, 
-                     df = df_plot
+# Function to draw grid and safed for sub-collections of plots
+f_save_grid_suffix <- function(plot_list, suffix){
+  
+  plot_names <- names(plot_list)
+  plots_for_grid <- plot_list[str_extract(plot_names, "(?<=_)[0-9.]+$") == suffix]
+  title <- names(plots_for_grid)
+  
+  grid <- f_grid(plots_for_grid)
+  
+  ggsave(filename = paste0(dir_out, pre, "_", suffix, "_grid", ".svg"),
+         plot = grid, 
+         width = 9, 
+         height = 4, 
+         units = "in"
+  )
+  
+}
+
+# Plot + safe
+grouped_dpi_OD <- df_plot %>%
+  group_by(date_scoring, OD) %>%
+  group_split() 
+
+titles_dpi_OD <- map_chr(
+  grouped_dpi_OD, ~ paste(unique(.x$date_scoring), 
+                        "OD", unique(.x$OD),
+                        sep = "_"
+                        )
 )
 
-dpi_grid <- f_grid(plot_list = strain_plots)
+plots_dpi_OD <- map2(.x = grouped_dpi_OD,
+                 .y = titles_dpi_OD,
+                 .f = ~ f_dpi_plot(
+                   df = .x, 
+                   title = .y
+                   )
+                 )
+
+# Name plots based on title
+names(plots_dpi_OD) <- titles_dpi_OD
+
+# extract unique factors by which plots will be safed
+unique_dpi <- unique(df_plot$date_scoring)
+unique_OD <- unique(df_plot$OD)
+
+lapply(unique_dpi,
+       f_save_grid_prefix,
+       plot_list = plots_dpi_OD
+       )
+
+lapply(unique_OD,
+       f_save_grid_suffix,
+       plot_list = plots_dpi_OD
+)
+
+
 
 # # Save the plots using purrr::map2 and a lambda function
-# map2(.x = OD_plot_list, 
-# .y = unique_OD, 
+# map2(.x = plots_dpi_OD, 
+# .y = titles_dpi_OD, 
 # .f = ~ggsave(filename = paste0(dir_out, pre, "_boxplot_", SUF, .y, ".svg"),
 #       plot = .x, 
 #       width = 3.5, 
@@ -160,13 +224,6 @@ dpi_grid <- f_grid(plot_list = strain_plots)
 #       units = "in", 
 #       dpi = 300)
 # )
-
-ggsave(filename = paste0(dir_out, pre, "_DPI_grid", ".svg"),
-     plot = dpi_grid, 
-     width = 9, 
-     height = 4, 
-     units = "in", 
-     dpi = 300)
 
 #-------------------------
 
@@ -236,7 +293,7 @@ dev.off()
 df2 <- data.frame("date_infiltration" = df$`Date infiltartion`,
                   "Effector_line" = df$`Effector line`, 
                   "infiltration_spots" = df$`n (infiltration spots)`,
-                  "disease_pos" = df$`Positive = visual signs of cell death`,
+                "disease_pos" = df$`Positive = visual signs of cell death`,
                   "disease_neg" = df$`Negative = no visual signs of cell death`)
                   
 
